@@ -8,7 +8,9 @@ AWS.config.update({
     region: 'ap-northeast-1',
   },
   ...(process.env.NODE_ENV !== 'production'
-    ? { endpoint: process.env.AWS_ENDPOINT }
+    ? { endpoint: process.env.AWS_ENDPOINT,
+        credentials: new AWS.Credentials('dummy', 'dummy'),
+      }
     : {}),
 } as any);
 
