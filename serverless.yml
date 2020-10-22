@@ -1,0 +1,138 @@
+service: serverless
+
+# プラグインの設定
+plugins:
+  - serverless-webpack
+  - serverless-offline
+  - serverless-dynamodb-local
+
+# AWS側の設定
+provider:
+  name: aws
+  runtime: nodejs12.x
+  stage: dev
+  region: ap-northeast-1
+  apiGateway:
+    minimumCompressionSize: 1024
+  environment:
+    AWS_NODEJS_CONNECTION_REUSE_ENABLED: 1
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:DescribeTable
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+      Resource: 'arn:aws:dynamodb:ap-northeast-1:*:*'
+
+package:
+  excludeDevDependencies: true
+  exclude:
+    - serverless-http
+
+custom:
+  webpackIncludeModules: true
+  webpack:
+    webpackConfig: 'webpack.config.js'
+
+  dynamodb:
+    stages:
+      - dev
+    start:
+      port: 8088
+      inMemory: true
+      heapInitial: 200m
+      heapMax: 1g
+      migrate: true
+      seed: true
+      convertEmptyValues: true
+    seed:
+      dev:
+        sources:
+          - table: sequences
+            sources: [./migrations/sequences.json]
+         
+resources:
+  Resources:
+    sequences:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: sequences
+        AttributeDefinitions:
+          - AttributeName: sname
+            AttributeType: S
+        KeySchema:
+          - AttributeName: sname
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 6
+          WriteCapacityUnits: 6
+
+    talks:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: talks
+        AttributeDefinitions:
+          - AttributeName: bid
+            AttributeType: N
+          - AttributeName: num
+            AttributeType: N
+        KeySchema:
+          - AttributeName: bid
+            KeyType: HASH
+          - AttributeName: num
+            KeyType: RANGE
+        ProvisionedThroughput:
+          ReadCapacityUnits: 6
+          WriteCapacityUnits: 6
+
+    boards:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: boards
+        AttributeDefinitions:
+          - AttributeName: dummy
+            AttributeType: S
+          - AttributeName: bid
+            AttributeType: N
+          - AttributeName: gid
+            AttributeType: N
+          - AttributeName: gidNum
+            AttributeType: N
+        KeySchema:
+          - AttributeName: dummy
+            KeyType: HASH
+          - AttributeName: bid
+            KeyType: RANGE
+        ProvisionedThroughput:
+          ReadCapacityUnits: 6
+          WriteCapacityUnits: 6
+        GlobalSecondaryIndexes:
+          - IndexName: gsi1
+            KeySchema:
+              - AttributeName: gid
+                KeyType: HASH
+              - AttributeName: gidNum
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+            ProvisionedThroughput:
+              ReadCapacityUnits: 6
+              WriteCapacityUnits: 6
+
+# lambdaの設定
+functions:
+  app:
+    handler: src/index.handler
+    events:
+      - http:
+          method: ANY
+          path: '/'
+          cors: true
+      - http:
+          method: ANY
+          path: '{proxy+}'
+          cors: true
